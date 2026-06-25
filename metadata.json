@@ -1,0 +1,6 @@
+{
+  "name": "Google Sheets Database Portal",
+  "description": "A secure full-stack dashboard connected to Google Sheets as a database, offering seamless data visualization, editing, and management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
