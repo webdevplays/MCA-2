@@ -21,9 +21,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
-const DB_FILE_PATH = path.join(process.cwd(), "database.json");
+const IS_NETLIFY = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
+const BUNDLED_DB_FILE_PATH = path.join(process.cwd(), "database.json");
+const DB_FILE_PATH = IS_NETLIFY 
+  ? "/tmp/database.json" 
+  : path.join(process.cwd(), "database.json");
 
 let lastGoogleSheetsError: string | null = null;
+let inMemoryDb: any = null;
 
 // Default initial database content
 const DEFAULT_DATABASE = {
@@ -70,12 +75,28 @@ async function initDatabase() {
   try {
     await fs.access(DB_FILE_PATH);
   } catch {
-    // Write default database if file doesn't exist
-    await fs.writeFile(DB_FILE_PATH, JSON.stringify(DEFAULT_DATABASE, null, 2), "utf-8");
+    // If it doesn't exist, try to read the bundled database.json first to preserve pre-existing credentials/settings
+    let initialData = DEFAULT_DATABASE;
+    try {
+      const content = await fs.readFile(BUNDLED_DB_FILE_PATH, "utf-8");
+      initialData = JSON.parse(content);
+    } catch (err) {
+      console.log("[Database Init] Notice: Could not read bundled database.json, using DEFAULT_DATABASE.", err);
+    }
+
+    try {
+      await fs.writeFile(DB_FILE_PATH, JSON.stringify(initialData, null, 2), "utf-8");
+    } catch (writeErr: any) {
+      console.error("[Database Init] Warning: Failed to write database.json to", DB_FILE_PATH, writeErr.message);
+    }
   }
 }
 
 async function getDatabase() {
+  if (inMemoryDb) {
+    return inMemoryDb;
+  }
+
   // Try to load any local spreadsheet ID override from local file
   let localCustomSpreadsheetId: string | null = null;
   try {
@@ -104,14 +125,34 @@ async function getDatabase() {
   } else {
     lastGoogleSheetsError = "Google Sheets credentials or Spreadsheet ID not configured in environment secrets.";
   }
-  await initDatabase();
-  const content = await fs.readFile(DB_FILE_PATH, "utf-8");
-  return JSON.parse(content);
+
+  try {
+    await initDatabase();
+    const content = await fs.readFile(DB_FILE_PATH, "utf-8");
+    const db = JSON.parse(content);
+    inMemoryDb = db;
+    return db;
+  } catch (err: any) {
+    console.log("[Database] Notice: Using in-memory fallback database:", err.message);
+    if (!inMemoryDb) {
+      try {
+        const bundledContent = await fs.readFile(BUNDLED_DB_FILE_PATH, "utf-8");
+        inMemoryDb = JSON.parse(bundledContent);
+      } catch {
+        inMemoryDb = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
+      }
+    }
+    return inMemoryDb;
+  }
 }
 
 async function saveDatabase(data: any) {
-  // Always write a local JSON copy as cache/backup
-  await fs.writeFile(DB_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
+  inMemoryDb = data;
+  try {
+    await fs.writeFile(DB_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err: any) {
+    console.error("[Database Save] Warning: Could not write database update to file, kept in-memory:", err.message);
+  }
 }
 
 export async function createExpressApp(includeStaticAndVite = true) {
