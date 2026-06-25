@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs/promises";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import {
   isGoogleSheetsConfigured,
   loadDatabaseFromSheets,
@@ -17,15 +16,57 @@ import {
   getSpreadsheetId
 } from "./googleSheets.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+let currentFilename = "";
+let currentDirname = "";
+
+try {
+  if (typeof __filename !== "undefined") {
+    currentFilename = __filename;
+  } else if (import.meta && import.meta.url) {
+    currentFilename = fileURLToPath(import.meta.url);
+  }
+} catch (e) {
+  // Ignore
+}
+
+try {
+  if (typeof __dirname !== "undefined") {
+    currentDirname = __dirname;
+  } else if (currentFilename) {
+    currentDirname = path.dirname(currentFilename);
+  }
+} catch (e) {
+  // Ignore
+}
 
 const PORT = 3000;
 const IS_NETLIFY = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
-const BUNDLED_DB_FILE_PATH = path.join(process.cwd(), "database.json");
 const DB_FILE_PATH = IS_NETLIFY 
   ? "/tmp/database.json" 
   : path.join(process.cwd(), "database.json");
+
+async function findBundledDbPath() {
+  const possiblePaths = [
+    path.join(process.cwd(), "database.json"),
+    path.join(process.cwd(), "netlify/functions/database.json"),
+    path.join(currentDirname, "database.json"),
+    path.join(currentDirname, "..", "database.json"),
+    path.join(currentDirname, "..", "..", "database.json"),
+    "/var/task/database.json",
+    "/var/task/netlify/functions/database.json"
+  ];
+  
+  for (const p of possiblePaths) {
+    try {
+      await fs.access(p);
+      console.log(`[Database Init] Successfully resolved bundled database.json at: ${p}`);
+      return p;
+    } catch {
+      // Try next
+    }
+  }
+  return path.join(process.cwd(), "database.json");
+}
 
 let lastGoogleSheetsError: string | null = null;
 let inMemoryDb: any = null;
@@ -78,7 +119,8 @@ async function initDatabase() {
     // If it doesn't exist, try to read the bundled database.json first to preserve pre-existing credentials/settings
     let initialData = DEFAULT_DATABASE;
     try {
-      const content = await fs.readFile(BUNDLED_DB_FILE_PATH, "utf-8");
+      const bundledPath = await findBundledDbPath();
+      const content = await fs.readFile(bundledPath, "utf-8");
       initialData = JSON.parse(content);
     } catch (err) {
       console.log("[Database Init] Notice: Could not read bundled database.json, using DEFAULT_DATABASE.", err);
@@ -136,7 +178,8 @@ async function getDatabase() {
     console.log("[Database] Notice: Using in-memory fallback database:", err.message);
     if (!inMemoryDb) {
       try {
-        const bundledContent = await fs.readFile(BUNDLED_DB_FILE_PATH, "utf-8");
+        const bundledPath = await findBundledDbPath();
+        const bundledContent = await fs.readFile(bundledPath, "utf-8");
         inMemoryDb = JSON.parse(bundledContent);
       } catch {
         inMemoryDb = JSON.parse(JSON.stringify(DEFAULT_DATABASE));
@@ -158,6 +201,22 @@ async function saveDatabase(data: any) {
 export async function createExpressApp(includeStaticAndVite = true) {
   const app = express();
   app.use(express.json());
+
+  // URL rewrite for Netlify Functions prefix mapping
+  app.use((req, _res, next) => {
+    const originalUrl = req.url;
+    if (req.url.startsWith("/.netlify/functions/api")) {
+      req.url = req.url.replace("/.netlify/functions/api", "/api");
+    }
+    // Handle cases where the path starts with /.netlify/api or /api directly but has extra prefixing
+    if (req.url.startsWith("//api")) {
+      req.url = req.url.replace("//api", "/api");
+    }
+    if (originalUrl !== req.url) {
+      console.log(`[Netlify Route Rewrite] Mapped ${originalUrl} -> ${req.url}`);
+    }
+    next();
+  });
 
   // Initialize DB immediately on boot
   await initDatabase();
@@ -761,6 +820,7 @@ export async function createExpressApp(includeStaticAndVite = true) {
   // 3. VITE OR STATIC FILE HANDLER MIDDLEWARE
   if (includeStaticAndVite) {
     if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",

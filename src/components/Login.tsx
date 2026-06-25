@@ -212,7 +212,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
         {/* Footer */}
         <div className="text-center mt-6 text-xs text-slate-600">
-          Secure Session API Engine v1.2.0 • Running on Port 3000
+          Secure Session API Engine v1.2.0 • {window.location.hostname.includes("netlify.app") ? "Deployed on Netlify Serverless" : "Running on Port 3000"}
         </div>
       </motion.div>
     </div>
