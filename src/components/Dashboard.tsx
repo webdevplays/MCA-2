@@ -855,7 +855,7 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                         <th className="py-3 px-4 hidden print:table-cell print:text-slate-950">PIN</th>
                         <th className="py-3 px-4 print:text-slate-950">Full Name</th>
                         <th className="py-3 px-4 print:hidden">Address</th>
-                        <th className="py-3 px-4 hidden print:table-cell print:text-slate-950">Address (This is Blank admin will write here)</th>
+                        <th className="py-3 px-4 hidden print:table-cell print:text-slate-950">Address</th>
                         <th className="py-3 px-4 print:hidden">Registered Date</th>
                         <th className="py-3 px-4 text-right print:hidden">Actions</th>
                       </tr>
