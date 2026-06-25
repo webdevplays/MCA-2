@@ -850,24 +850,31 @@ export default function Dashboard({ user, token, onLogout }: DashboardProps) {
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-950/60 text-slate-400 print:bg-slate-100 print:text-slate-950 print:border-b-2 print:border-slate-300 uppercase tracking-wider font-semibold border-b border-slate-800">
-                        <th className="py-3 px-4 print:text-slate-950">ID</th>
-                        <th className="py-3 px-4 print:text-slate-950">PIN Code (12 Digits)</th>
+                        <th className="py-3 px-4 print:hidden">ID</th>
+                        <th className="py-3 px-4 print:hidden">PIN Code (12 Digits)</th>
+                        <th className="py-3 px-4 hidden print:table-cell print:text-slate-950">PIN</th>
                         <th className="py-3 px-4 print:text-slate-950">Full Name</th>
-                        <th className="py-3 px-4 print:text-slate-950">Address</th>
-                        <th className="py-3 px-4 print:text-slate-950">Registered Date</th>
+                        <th className="py-3 px-4 print:hidden">Address</th>
+                        <th className="py-3 px-4 hidden print:table-cell print:text-slate-950">Address (This is Blank admin will write here)</th>
+                        <th className="py-3 px-4 print:hidden">Registered Date</th>
                         <th className="py-3 px-4 text-right print:hidden">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 print:divide-slate-300 font-mono">
                       {filteredRows.map((row) => (
-                        <tr key={row.id} className="hover:bg-slate-800/30 print:hover:bg-transparent transition-colors">
-                          <td className="py-3.5 px-4 font-semibold text-slate-500 print:text-slate-950">{row.id}</td>
-                          <td className="py-3.5 px-4 text-blue-400 print:text-blue-900 font-bold tracking-wide">{row.pin}</td>
-                          <td className="py-3.5 px-4 text-slate-200 print:text-slate-950 font-sans font-medium">{row.fullName}</td>
-                          <td className="py-3.5 px-4 text-slate-400 print:text-slate-800 font-sans max-w-xs truncate" title={row.address}>
+                        <tr key={row.id} className="hover:bg-slate-800/30 print:hover:bg-transparent transition-colors print:border-b print:border-slate-200">
+                          <td className="py-3.5 px-4 font-semibold text-slate-500 print:hidden">{row.id}</td>
+                          <td className="py-3.5 px-4 text-blue-400 print:text-blue-900 font-bold tracking-wide print:py-6">{row.pin}</td>
+                          <td className="py-3.5 px-4 text-slate-200 print:text-slate-950 font-sans font-medium print:py-6">{row.fullName}</td>
+                          {/* Screen view Address */}
+                          <td className="py-3.5 px-4 text-slate-400 font-sans max-w-xs truncate print:hidden" title={row.address}>
                             {row.address || <span className="text-slate-600 italic">Blank</span>}
                           </td>
-                          <td className="py-3.5 px-4 text-slate-500 print:text-slate-600 text-[11px]">{row.createdAt || "N/A"}</td>
+                          {/* Print view Address - blank line for handwriting */}
+                          <td className="py-3.5 px-4 hidden print:table-cell print:py-6">
+                            <div className="border-b border-dashed border-slate-400 w-full h-8 mt-1"></div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-500 print:hidden text-[11px]">{row.createdAt || "N/A"}</td>
                           <td className="py-3.5 px-4 text-right print:hidden">
                             <div className="inline-flex items-center gap-1">
                               <button
